@@ -53,7 +53,8 @@ PropertyBinding.prototype = {
 
 			objectName = parsedPath.objectName,
 			propertyName = parsedPath.propertyName,
-			propertyIndex = parsedPath.propertyIndex;
+			propertyIndex = parsedPath.propertyIndex,
+			propertySubProp = parsedPath.propertySubProp;
 
 		if ( ! targetObject ) {
 
@@ -68,7 +69,7 @@ PropertyBinding.prototype = {
 		this.getValue = this._getValue_unavailable;
 		this.setValue = this._setValue_unavailable;
 
- 		// ensure there is a value node
+		// ensure there is a value node
 		if ( ! targetObject ) {
 
 			console.error( "  trying to update node for track: " + this.path + " but it wasn't found." );
@@ -229,6 +230,12 @@ PropertyBinding.prototype = {
 
 			this.resolvedProperty = nodeProperty;
 			this.propertyIndex = propertyIndex;
+			
+			if ( propertySubProp !== undefined )
+			{
+				bindingType = this.BindingType.ArrayElementProp;
+				this.propertySubProp = propertySubProp;
+			}
 
 		} else if ( nodeProperty.fromArray !== undefined && nodeProperty.toArray !== undefined ) {
 			// must use copy for Object3D.Euler/Quaternion
@@ -282,7 +289,8 @@ Object.assign( PropertyBinding.prototype, { // prototype, continued
 		Direct: 0,
 		EntireArray: 1,
 		ArrayElement: 2,
-		HasFromToArray: 3
+		HasFromToArray: 3,
+		ArrayElementProp: 4
 	},
 
 	Versioning: {
@@ -320,6 +328,12 @@ Object.assign( PropertyBinding.prototype, { // prototype, continued
 		function getValue_toArray( buffer, offset ) {
 
 			this.resolvedProperty.toArray( buffer, offset );
+
+		},
+
+		function getValue_arrayElementProp( buffer, offset ) {
+
+			buffer[ offset ] = this.resolvedProperty[ this.propertyIndex ] [ this.propertySubProp ];
 
 		}
 
@@ -442,6 +456,30 @@ Object.assign( PropertyBinding.prototype, { // prototype, continued
 
 			}
 
+		], [
+
+			// ArrayElementProp
+
+			function setValue_arrayElementProp( buffer, offset ) {
+
+				this.resolvedProperty[ this.propertyIndex ] [this.propertySubProp] = buffer[ offset ];
+
+			},
+
+			function setValue_arrayElementProp_setNeedsUpdate( buffer, offset ) {
+
+				this.resolvedProperty[ this.propertyIndex ] [this.propertySubProp] = buffer[ offset ];
+				this.targetObject.needsUpdate = true;
+
+			},
+
+			function setValue_arrayElementProp_setMatrixWorldNeedsUpdate( buffer, offset ) {
+
+				this.resolvedProperty[ this.propertyIndex ] [this.propertySubProp] = buffer[ offset ];
+				this.targetObject.matrixWorldNeedsUpdate = true;
+
+			}
+
 		]
 
 	]
@@ -544,7 +582,7 @@ PropertyBinding.parseTrackName = function( trackName ) {
 	//    scene:helium_balloon_model:helium_balloon_model.position
 	// created and tested via https://regex101.com/#javascript
 
-	var re = /^((?:[\w-]+[\/:])*)([\w-]+)?(?:\.([\w-]+)(?:\[(.+)\])?)?\.([\w-]+)(?:\[(.+)\])?$/;
+	var re = /^((?:[\w-]+[\/:])*)([\w-]+)?(?:\.([\w-]+)(?:\[(.+)\])?)?\.([\w-]+)(?:\[(.+)\])?(?:\.([\w-\d]+))?$/;
 	var matches = re.exec( trackName );
 
 	if ( ! matches ) {
@@ -559,7 +597,8 @@ PropertyBinding.parseTrackName = function( trackName ) {
 		objectName: matches[ 3 ],
 		objectIndex: matches[ 4 ],
 		propertyName: matches[ 5 ],
-		propertyIndex: matches[ 6 ]	// allowed to be null, specifies that the whole property is set.
+		propertyIndex: matches[ 6 ],	// allowed to be null, specifies that the whole property is set.
+		propertySubProp: matches[ 7 ]  // May be null
 	};
 
 	if ( results.propertyName === null || results.propertyName.length === 0 ) {
