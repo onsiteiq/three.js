@@ -77,11 +77,11 @@ AnimationObjectGroup.prototype = {
 
 	isAnimationObjectGroup: true,
 
-    clearIndicesByUUID : function() {
-        
-        this._indicesByUUID = {};
-    },
-        
+	clearIndicesByUUID : function() {
+		
+		this._indicesByUUID = {};
+	},
+
 	add: function( var_args ) {
 
 		var objects = this._objects,
